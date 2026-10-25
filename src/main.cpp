@@ -1,4 +1,5 @@
 #include "Dialogue.h"
+#include "Recolor.h"
 #include "Settings.h"
 #include "UI.h"
 
@@ -32,6 +33,7 @@ namespace
 			break;
 		case SKSE::MessagingInterface::kDataLoaded:
 			Dialogue::Install();
+			Recolor::Install();
 			break;
 		default:
 			break;

@@ -19,7 +19,7 @@ namespace Settings
 	{
 		bool        enabled = true;
 		SourceMode  source = SourceMode::kCreator;
-		bool        useColor = true;       // wrap the tag in <font color>
+		bool        useColor = true;       // color the tag (done on the Flash side, see Recolor.cpp)
 		bool        hideOfficial = false;  // do not tag lines from the official game files
 		bool        showExtension = false; // "MyMod.esp" instead of "MyMod"
 		int         maxTagLength = 16;     // 0 = no limit

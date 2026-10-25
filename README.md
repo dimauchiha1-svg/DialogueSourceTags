@@ -58,7 +58,7 @@ The menu is designed for SKSE Menu Framework 3. During the build, the workflow d
 |---|---|
 | `Enabled` | `1` enabled, `0` disabled |
 | `Source` | `Creator` (default): the plugin that created the line. `LastModifier`: the last plugin that changed it. `Both`: shows `[Creator>LastModifier]` when they differ |
-| `UseColor` | `1` colored tags, `0` plain tags. Set to `0` if raw `<font ...>` text appears in the list |
+| `UseColor` | `1` colored tags, `0` tags in the normal text color |
 | `HideOfficial` | `1` = do not tag lines from official game files, so only mod-added lines are marked |
 | `ShowExtension` | `1` = `MyMod.esp`, `0` = `MyMod` |
 | `MaxTagLength` | Maximum tag length in characters, `0` = no limit |
@@ -68,13 +68,14 @@ The menu is designed for SKSE Menu Framework 3. During the build, the workflow d
 
 ## How it works
 
-The dialogue menu keeps a list of response options. Each option knows the dialogue record (INFO) it comes from, and each record knows which plugin files define it. The plugin hooks the dialogue menu's message handler and adds the tag to the text of every option before the menu displays it. The change is idempotent: a line that already has its tag is not tagged twice.
+The dialogue menu keeps a list of response options. Each option knows the dialogue record (INFO) it comes from, and each record knows which plugin files define it. The plugin hooks the dialogue menu's message handler and adds a plain `[PluginName]` tag to the text of every option before the menu displays it. Because the list sets the text color of whole lines itself, the colors are applied separately: while the dialogue menu is open, the tag part of each entry gets its own text format every frame, so the color survives the list redrawing its entries.
 
 ## Diagnostics
 
 Log file: `Documents\My Games\Skyrim Special Edition\SKSE\DialogueSourceTags.log` (for GOG: `Skyrim Special Edition GOG`).
 
 - `Hook installed on DialogueMenu::ProcessMessage` means the plugin loaded and installed its hook.
+- `Hook installed on DialogueMenu::AdvanceMovie` and `Recolor: tags colored through ...` mean the coloring works. If the tags have no color, the log contains a dump of the dialogue menu structure; send it to the author.
 - `DialogueSourceTags menu registered in SKSE Menu Framework` means the menu is connected.
 - Lines starting with `Tagged line` show which lines were tagged. If you open a dialogue and see no such lines, the options are probably built at a different moment than the plugin expects. Send the log to the author.
 
@@ -90,6 +91,7 @@ Log file: `Documents\My Games\Skyrim Special Edition\SKSE\DialogueSourceTags.log
 src/main.cpp       entry point, log, SKSE events
 src/Settings.*     INI reading and writing, thread-safe settings snapshots
 src/Dialogue.*     hook on the dialogue menu, tag building (colors, names)
+src/Recolor.*      colors the tags inside the Flash dialogue list
 src/UI.*           menu for SKSE Menu Framework
 CMakeLists.txt, vcpkg*.json   build (CommonLibSSE NG via vcpkg)
 .github/workflows/build.yml   build on GitHub Actions

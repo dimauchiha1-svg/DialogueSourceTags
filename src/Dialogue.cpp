@@ -36,6 +36,15 @@ namespace Dialogue
 		std::mutex            g_seenLock;
 		std::set<std::string> g_seen;  // plugin file names (original case)
 
+		std::mutex                                 g_tagLock;
+		std::unordered_map<std::string, std::string> g_tagFiles;  // tag text -> plugin file name it stands for
+
+		void NoteTag(const std::string& a_tag, const std::string& a_fileName)
+		{
+			std::scoped_lock lock(g_tagLock);
+			g_tagFiles[a_tag] = a_fileName;
+		}
+
 		void NoteSeen(const std::string& a_fileName)
 		{
 			std::scoped_lock lock(g_seenLock);
@@ -82,29 +91,6 @@ namespace Dialogue
 			std::snprintf(buf, sizeof(buf), "%02X%02X%02X",
 				static_cast<int>((r + m) * 255.0 + 0.5), static_cast<int>((g + m) * 255.0 + 0.5), static_cast<int>((b + m) * 255.0 + 0.5));
 			return buf;
-		}
-
-		std::string EscapeHtml(const std::string& a_text)
-		{
-			std::string out;
-			out.reserve(a_text.size());
-			for (const char c : a_text) {
-				switch (c) {
-				case '&':
-					out += "&amp;";
-					break;
-				case '<':
-					out += "&lt;";
-					break;
-				case '>':
-					out += "&gt;";
-					break;
-				default:
-					out += c;
-					break;
-				}
-			}
-			return out;
 		}
 
 		// Display name of a plugin: alias from the INI, otherwise the file name (without extension by default), truncated.
@@ -172,15 +158,17 @@ namespace Dialogue
 				return {};
 			}
 
-			std::string tag = EscapeHtml(DisplayName(cfg, primaryName));
+			std::string tag = DisplayName(cfg, primaryName);
 			if (cfg.source == Settings::SourceMode::kBoth && creator && last && creator != last) {
 				const std::string lastName(last->GetFilename());
 				NoteSeen(lastName);
-				tag += ">" + EscapeHtml(DisplayName(cfg, lastName));
+				tag += "/" + DisplayName(cfg, lastName);
 			}
 
+			// The tag is plain text. When colors are enabled, the Flash side colors it later (see Recolor.cpp),
+			// looking the color up by the tag text.
 			if (cfg.useColor) {
-				return "<font color='#" + ColorFor(cfg, primaryName) + "'>[" + tag + "]</font> ";
+				NoteTag(tag, primaryName);
 			}
 			return "[" + tag + "] ";
 		}
@@ -263,6 +251,28 @@ namespace Dialogue
 	std::string ResolveName(const Settings::Data& a_cfg, const std::string& a_fileName)
 	{
 		return DisplayName(a_cfg, a_fileName);
+	}
+
+	bool LookupTagColor(const std::string& a_tag, std::uint32_t& a_rgb)
+	{
+		std::string file;
+		{
+			std::scoped_lock lock(g_tagLock);
+			const auto       it = g_tagFiles.find(a_tag);
+			if (it == g_tagFiles.end()) {
+				return false;
+			}
+			file = it->second;
+		}
+
+		const auto  cfg = Settings::Get();
+		const auto  hex = ColorFor(*cfg, file);
+		unsigned    v = 0;
+		if (std::sscanf(hex.c_str(), "%x", &v) != 1) {
+			return false;
+		}
+		a_rgb = v & 0xFFFFFF;
+		return true;
 	}
 
 	std::vector<std::string> GetSeenPlugins()

@@ -28,6 +28,8 @@ add_commonlibsse_plugin(${PROJECT_NAME}
         src/Settings.h
         src/Dialogue.cpp
         src/Dialogue.h
+        src/Recolor.cpp
+        src/Recolor.h
         src/UI.cpp
         src/UI.h
 )
