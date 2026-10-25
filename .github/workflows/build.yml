@@ -1,0 +1,79 @@
+name: Build DialogueSourceTags
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      menu:
+        description: "Build the SKSE Menu Framework 3 settings menu"
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # The menu only needs the SKSEMenuFramework.h header from the API repository.
+      - name: Fetch SKSE Menu Framework API header
+        id: api
+        shell: pwsh
+        run: |
+          $menu = "OFF"
+          $dir = ""
+          if ("${{ inputs.menu }}" -ne "false") {
+            git clone --depth 1 https://github.com/QTR-Modding/SKSE-Menu-Framework-3-API.git mfapi
+            if ($LASTEXITCODE -eq 0 -and (Test-Path mfapi/SKSEMenuFramework.h)) {
+              $menu = "ON"
+              $dir = "$env:GITHUB_WORKSPACE/mfapi"
+            } else {
+              Write-Host "::warning::Could not download the SKSE Menu Framework header, the plugin will be built without the menu"
+            }
+          }
+          "menu=$menu" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+            -DVCPKG_HOST_TRIPLET=x64-windows-static `
+            -DDIALOGUESOURCETAGS_MENU=${{ steps.api.outputs.menu }} `
+            "-DMENU_API_DIR=${{ steps.api.outputs.dir }}"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Diagnostics (dependencies of the DLL)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $dll = Get-ChildItem -Path build -Recurse -Filter DialogueSourceTags.dll | Select-Object -First 1
+          if ($dll) { dumpbin /dependents $dll.FullName }
+
+      - name: Collect mod files
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Path build -Recurse -Filter DialogueSourceTags.dll | Select-Object -First 1
+          if (-not $dll) { throw "DialogueSourceTags.dll not found" }
+          New-Item -ItemType Directory -Force -Path dist/Data/SKSE/Plugins | Out-Null
+          Copy-Item $dll.FullName dist/Data/SKSE/Plugins/
+          Copy-Item dist-template/Data/SKSE/Plugins/DialogueSourceTags.ini dist/Data/SKSE/Plugins/
+
+      - name: Upload mod
+        uses: actions/upload-artifact@v4
+        with:
+          name: DialogueSourceTags
+          path: dist/
