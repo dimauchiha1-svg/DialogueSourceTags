@@ -3,9 +3,6 @@
 #include "Dialogue.h"
 #include "Settings.h"
 
-#include <functional>
-#include <utility>
-#include <vector>
 #include <string>
 
 namespace Recolor
@@ -40,30 +37,6 @@ namespace Recolor
 			}
 			a_out = v;
 			return true;
-		}
-
-		// Calls a_fn(name, value) for every member of an object. Supports both visitor styles of CommonLibSSE.
-		template <class F>
-		bool VisitChildren(RE::GFxValue& a_obj, F&& a_fn)
-		{
-			using V = RE::GFxValue;
-			if constexpr (requires(V& v, std::function<void(const char*, const V&)> fn) { v.VisitMembers(std::move(fn)); }) {
-				a_obj.VisitMembers(std::function<void(const char*, const V&)>(std::forward<F>(a_fn)));
-				return true;
-			} else if constexpr (requires(V& v, typename V::ObjectVisitor* p) { v.VisitMembers(p); }) {
-				struct Visitor : V::ObjectVisitor
-				{
-					explicit Visitor(F& a_f) :
-						fn(a_f) {}
-					void Visit(const char* a_name, const V& a_val) override { fn(a_name, a_val); }
-					F& fn;
-				};
-				Visitor visitor(a_fn);
-				a_obj.VisitMembers(&visitor);
-				return true;
-			} else {
-				return false;
-			}
 		}
 
 		// Number of UTF-16 code units in the first a_bytes bytes of a UTF-8 string (BMP only is enough here).
@@ -120,50 +93,52 @@ namespace Recolor
 			const char* path = nullptr;
 		} g_state;
 
-		// Looks at the children of a list clip; entries are the ones that have a text field.
-		int ColorList(RE::GFxMovieView* a_movie, RE::GFxValue& a_list, int a_depth)
+		// The list keeps its entry clips as members named Entry0, Entry1, ... (BSScrollingList).
+		constexpr int kMaxEntries = 32;
+
+		int ColorList(RE::GFxMovieView* a_movie, RE::GFxValue& a_list)
 		{
 			int colored = 0;
+			for (int i = 0; i < kMaxEntries; ++i) {
+				const std::string name = "Entry" + std::to_string(i);
 
-			std::vector<std::pair<std::string, RE::GFxValue>> children;
-			const bool                                        ok = VisitChildren(a_list, [&](const char* a_name, const RE::GFxValue& a_val) {
-                if (a_name && IsClip(a_val)) {
-                    children.emplace_back(a_name, a_val);
-                }
-            });
-			if (!ok) {
-				return 0;
-			}
-
-			for (auto& [name, child] : children) {
+				RE::GFxValue clip;
+				if (!GetMemberSafe(a_list, name.c_str(), clip)) {
+					break;
+				}
 				RE::GFxValue tf;
-				if (GetMemberSafe(child, "textField", tf)) {
-					if (ColorEntry(a_movie, tf)) {
-						++colored;
-					}
-				} else if (a_depth > 0 && name != "parent" && name != "_parent") {
-					colored += ColorList(a_movie, child, a_depth - 1);
+				if (GetMemberSafe(clip, "textField", tf) && ColorEntry(a_movie, tf)) {
+					++colored;
 				}
 			}
 			return colored;
 		}
 
+		// Diagnostics, written once: which candidate paths exist and what the first entry looks like.
 		void LogStructure(RE::GFxMovieView* a_movie)
 		{
-			spdlog::info("Recolor: no colored tag found, dumping the dialogue menu structure once");
-			const char* paths[] = { "_root.DialogueMenu_mc", "_root.DialogueMenu_mc.TopicListHolder", "_root.DialogueMenu_mc.TopicListHolder.List" };
-			for (const auto* path : paths) {
-				RE::GFxValue obj;
-				if (!a_movie->GetVariable(&obj, path) || !IsClip(obj)) {
-					spdlog::info("  {} not found", path);
+			spdlog::info("Recolor: no colored tag found, logging the dialogue list structure once");
+			for (const auto* path : kListPaths) {
+				RE::GFxValue list;
+				if (!a_movie->GetVariable(&list, path) || !IsClip(list)) {
+					spdlog::info("  {}: not found", path);
 					continue;
 				}
-				spdlog::info("  {}:", path);
-				const bool ok = VisitChildren(obj, [&](const char* a_name, const RE::GFxValue& a_val) {
-					spdlog::info("    member: {} (type {})", a_name ? a_name : "?", static_cast<int>(a_val.GetType()));
-				});
-				if (!ok) {
-					spdlog::info("    member enumeration is not available in this CommonLibSSE version");
+				spdlog::info("  {}: found", path);
+
+				RE::GFxValue entry, tf, text;
+				if (!GetMemberSafe(list, "Entry0", entry)) {
+					spdlog::info("    no member Entry0");
+					continue;
+				}
+				if (!GetMemberSafe(entry, "textField", tf)) {
+					spdlog::info("    Entry0 has no member textField");
+					continue;
+				}
+				if (GetMemberSafe(tf, "text", text) && text.IsString()) {
+					spdlog::info("    Entry0.textField.text = '{}'", text.GetString());
+				} else {
+					spdlog::info("    Entry0.textField has no string member text");
 				}
 			}
 		}
@@ -186,7 +161,7 @@ namespace Recolor
 				if (!movie->GetVariable(&list, path) || !IsClip(list)) {
 					continue;
 				}
-				colored = ColorList(movie, list, 2);
+				colored = ColorList(movie, list);
 				if (colored > 0) {
 					if (!g_state.pathLogged) {
 						g_state.pathLogged = true;

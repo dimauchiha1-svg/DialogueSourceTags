@@ -75,7 +75,7 @@ The dialogue menu keeps a list of response options. Each option knows the dialog
 Log file: `Documents\My Games\Skyrim Special Edition\SKSE\DialogueSourceTags.log` (for GOG: `Skyrim Special Edition GOG`).
 
 - `Hook installed on DialogueMenu::ProcessMessage` means the plugin loaded and installed its hook.
-- `Hook installed on DialogueMenu::AdvanceMovie` and `Recolor: tags colored through ...` mean the coloring works. If the tags have no color, the log contains a dump of the dialogue menu structure; send it to the author.
+- `Hook installed on DialogueMenu::AdvanceMovie` and `Recolor: tags colored through ...` mean the coloring works. If the tags have no color, the log contains a short report about the dialogue list; send it to the author.
 - `DialogueSourceTags menu registered in SKSE Menu Framework` means the menu is connected.
 - Lines starting with `Tagged line` show which lines were tagged. If you open a dialogue and see no such lines, the options are probably built at a different moment than the plugin expects. Send the log to the author.
 
