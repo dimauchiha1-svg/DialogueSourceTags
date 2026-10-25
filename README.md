@@ -58,7 +58,7 @@ The menu is designed for SKSE Menu Framework 3. During the build, the workflow d
 |---|---|
 | `Enabled` | `1` enabled, `0` disabled |
 | `Source` | `Creator` (default): the plugin that created the line. `LastModifier`: the last plugin that changed it. `Both`: shows `[Creator>LastModifier]` when they differ |
-| `UseColor` | `1` colored tags, `0` tags in the normal text color |
+| `UseColor` | `1` colored tags, `0` tags in the normal text color. The color is applied by recoloring the tag inside the dialogue list while the menu is open (see "How it works") |
 | `HideOfficial` | `1` = do not tag lines from official game files, so only mod-added lines are marked |
 | `ShowExtension` | `1` = `MyMod.esp`, `0` = `MyMod` |
 | `MaxTagLength` | Maximum tag length in characters, `0` = no limit |
@@ -81,6 +81,7 @@ Log file: `Documents\My Games\Skyrim Special Edition\SKSE\DialogueSourceTags.log
 
 ## Limitations
 
+- Tag colors rely on the standard Skyrim dialogue list (entries named `Entry0`, `Entry1`, ...). Interface replacers that rebuild the dialogue menu may show uncolored tags; the tags themselves still appear.
 - Only response options that belong to a dialogue record (INFO) are tagged. Special entries without one (for example some built-in menu entries) are left as they are.
 - Other mods that rewrite the dialogue menu text (for example, ones that renumber or recolor options) may interact with the tags. The `Both`, `HideOfficial` and `UseColor` options can help.
 - Only the original plugin that defined the line is known to the game; lines created at runtime by scripts have no source plugin and are left untouched.
